@@ -12,7 +12,6 @@ class PlotsTab(QWidget):
         # Buttons on top of the plot
         self.control_top_panel = QWidget()
         self.control_top_panel_layout = QGridLayout()
-        
 
         # Create three toggle buttons
         self.button1 = QPushButton("Position Control")

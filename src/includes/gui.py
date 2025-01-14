@@ -18,6 +18,7 @@ import odrive
 from .mywidgets.topbar import TopBarWidget
 from .mywidgets.tabsWindow import TabsMainWidget
 from .mywidgets.tabs.plotsTab import PlotsTab
+from .mywidgets.dataBuffer import DataBuffer
 from odrive.enums import *
 
 class ODriveGUI(QMainWindow):
@@ -30,10 +31,14 @@ class ODriveGUI(QMainWindow):
         # Helper object fields
         self.motors = []
         self.curr_motor = 0
-        self.data_buffer = np.linspace(0, 10, 1000)
+        self.data_buffer = None
+        self.buffer_len = 50
+        self.plot_buffer_len = 5000
         self.phase = 0  # A variable to control animation
-        self.plot_active = None
+        self.plot_active = False
         self.mode = None
+        self.static_helper = np.linspace(1,5000,5000)
+        self.pos_plot_buffer = []
 
         # Main layout
         self.main_layout = QVBoxLayout()
@@ -73,10 +78,6 @@ class ODriveGUI(QMainWindow):
         self.timer_datapoll.timeout.connect(self._get_motor_state)
         self.timer_datapoll.start(200)  # Refresh every `refresh_interval` ms
 
-        self.timer_plot = QTimer(self)
-        self.timer_plot.timeout.connect(self._update_plot)
-        self.timer_plot.start(100)  # Refresh every `refresh_interval` ms
-
     # TOP BAR HELPER FUNCTIONS
     def _QComboBox_activated(self, index):
         self.curr_motor = index
@@ -102,7 +103,12 @@ class ODriveGUI(QMainWindow):
         self.top_bar.motor_dropdown.clear()
         if self.motors:
             self.top_bar.motor_dropdown.addItems(self.motor_ids)
-            if self.timer_datapoll.
+            if not self.timer_datapoll.isActive():
+                not self.timer_datapoll.start()
+            self.data_buffer = DataBuffer(batch_size= self.buffer_len, motor = self.motors[self.curr_motor])
+            self.data_buffer.data_batch_ready.connect(self._update_plot)
+            self.data_buffer.start()
+
 
     def get_connected_motors(self):
         """Fetch the list of connected motors."""
@@ -125,9 +131,9 @@ class ODriveGUI(QMainWindow):
         return motors, motor_ids
 
     def reboot_motor(self):
-        self.motors[self.curr_motor].reboot()
         self.timer_datapoll.stop()
         self.timer_plot.stop()
+        self.motors[self.curr_motor].reboot()
         time.sleep(6)
         self.refresh_motor_list()
 
@@ -140,21 +146,21 @@ class ODriveGUI(QMainWindow):
             #print(self.motors[self.curr_motor])
             self.motors[self.curr_motor].axis0.controller.config.control_mode = ControlMode.POSITION_CONTROL
             self.motors[self.curr_motor].axis0.requested_state = AxisState.CLOSED_LOOP_CONTROL
-            self.plot_active = 'P'
+            self.plot_active = True
         elif button_id == 2:
             # Activate Velocity mode
             self.motors[self.curr_motor].axis0.controller.config.control_mode = ControlMode.VELOCITY_CONTROL
             self.motors[self.curr_motor].axis0.requested_state = AxisState.CLOSED_LOOP_CONTROL
-            self.plot_active = 'V'
+            self.plot_active = True
         elif button_id == 3:
             # Activate Torque Mode
             self.motors[self.curr_motor].axis0.controller.config.control_mode = ControlMode.TORQUE_CONTROL
             self.motors[self.curr_motor].axis0.requested_state = AxisState.CLOSED_LOOP_CONTROL
-            self.plot_active = 'T'
+            self.plot_active = True
         elif button_id == 4:
             # Activate Calibration
             self.motors[self.curr_motor].axis0.requested_state = AxisState.IDLE
-            self.plot_active = None
+            self.plot_active = False
 
         self.mode = self.motors[self.curr_motor].axis0.controller.config.control_mode
 
@@ -174,27 +180,15 @@ class ODriveGUI(QMainWindow):
         else:
             self.top_bar.state.setText('-')
 
-    def _update_plot(self):
+    def _update_plot(self, batch):
         """Update the plot with new data."""
         # Generate sine wave data with an animated phase
-        match self.plot_active:
-            case 'P':
-                y = np.sin(self.data_buffer + self.phase)
-                self.phase += 0.3  # Increment the phase to animate the wave
-                self.plot_window.graph_widget.clear()  # Clear previous data
-                self.plot_window.graph_widget.plot(self.data_buffer, y, pen=pg.mkPen(color="b", width=2))
-            case 'V':
-                y = np.sin(self.data_buffer + self.phase) + np.sin(self.data_buffer*1.5 + self.phase + 2)
-                self.phase += 0.3  # Increment the phase to animate the wave
-                self.plot_window.graph_widget.clear()  # Clear previous data
-                self.plot_window.graph_widget.plot(self.data_buffer, y, pen=pg.mkPen(color="b", width=2))
-            case 'T':
-                y = np.sin(self.data_buffer + self.phase) + np.sin(self.data_buffer*1.5 + self.phase - 8)*2
-                self.phase += 0.3  # Increment the phase to animate the wave
-                self.plot_window.graph_widget.clear()  # Clear previous data
-                self.plot_window.graph_widget.plot(self.data_buffer, y, pen=pg.mkPen(color="b", width=2))
-            case _:
-                pass
+        if self.plot_active:
+            self.pos_plot_buffer.extend(batch[0])
+            if len(self.pos_plot_buffer) == self.plot_buffer_len:
+                self.pos_plot_buffer = [self.pos_plot_buffer.pop() for idx in range(self.buffer_len)]
+            self.plot_window.graph_widget.clear()  # Clear previous data
+            self.plot_window.graph_widget.plot(self.static_helper[0:len(self.pos_plot_buffer)], np.array(self.pos_plot_buffer).ravel(), pen=pg.mkPen(color="b", width=2))
 
     def closeEvent(self, event):
         for i in self.motors:
