@@ -25,14 +25,15 @@ class ODriveGUI(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("ODrive Motor Controller")
-        self.setFixedWidth(int(1920*0.75))
-        self.setFixedHeight(int(1080*0.75))
+        #self.setFixedWidth(int(1920*0.75))
+        #self.setFixedHeight(int(1080*0.75))
         # Helper object fields
         self.motors = []
         self.curr_motor = 0
         self.data_buffer = np.linspace(0, 10, 1000)
         self.phase = 0  # A variable to control animation
         self.plot_active = None
+        self.mode = None
 
         # Main layout
         self.main_layout = QVBoxLayout()
@@ -64,6 +65,7 @@ class ODriveGUI(QMainWindow):
 
         # Control Buttons
         self.plot_window.button_group.buttonClicked[int].connect(self.on_control_button_clicked)
+        self.plot_window.button1_setpoint.returnPressed.connect(self._set_setpoint)
 
         # Timers
         # Set up the QTimer for periodic updates
@@ -123,8 +125,12 @@ class ODriveGUI(QMainWindow):
 
     def reboot_motor(self):
         self.motors[self.curr_motor].reboot()
-        time.sleep(1)
+        self.timer_datapoll.stop()
+        self.timer_plot.stop()
+        time.sleep(6)
         self.refresh_motor_list()
+        self.timer_datapoll.start()
+        self.timer_plot.start()
 
     def on_control_button_clicked(self, button_id):
         """
@@ -133,7 +139,7 @@ class ODriveGUI(QMainWindow):
         if button_id == 1:
             # Activate Position mode
             #print(self.motors[self.curr_motor])
-            self.motors[self.curr_motor].axis0.config.control_mode = ControlMode.POSITION_CONTROL
+            self.motors[self.curr_motor].axis0.controller.config.control_mode = ControlMode.POSITION_CONTROL
             self.motors[self.curr_motor].axis0.requested_state = AxisState.CLOSED_LOOP_CONTROL
             self.plot_active = 'P'
         elif button_id == 2:
@@ -143,13 +149,25 @@ class ODriveGUI(QMainWindow):
             self.plot_active = 'V'
         elif button_id == 3:
             # Activate Torque Mode
-            self.motors[self.curr_motor].axis0.config.control_mode = ControlMode.TORQUE_CONTROL
+            self.motors[self.curr_motor].axis0.controller.config.control_mode = ControlMode.TORQUE_CONTROL
             self.motors[self.curr_motor].axis0.requested_state = AxisState.CLOSED_LOOP_CONTROL
             self.plot_active = 'T'
         elif button_id == 4:
             # Activate Calibration
             self.motors[self.curr_motor].axis0.requested_state = AxisState.IDLE
             self.plot_active = None
+
+        self.mode = self.motors[self.curr_motor].axis0.controller.config.control_mode
+
+    def _set_setpoint(self):
+        if self.motors:
+            match self.mode:
+                case 3:
+                    self.motors[self.curr_motor].axis0.controller.input_pos = self.plot_window.button1_setpoint.text()
+                case 2:
+                    self.motors[self.curr_motor].axis0.controller.input_vel = self.plot_window.button1_setpoint.text()
+                case 1:
+                    self.motors[self.curr_motor].axis0.controller.input_torque = self.plot_window.button1_setpoint.text()
 
     def _get_motor_state(self):
         if self.motors:
@@ -178,3 +196,7 @@ class ODriveGUI(QMainWindow):
                 self.plot_window.graph_widget.plot(self.data_buffer, y, pen=pg.mkPen(color="b", width=2))
             case _:
                 pass
+
+    def closeEvent(self, event):
+        for i in self.motors:
+            i.axis0.requested_state = AxisState.IDLE

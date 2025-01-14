@@ -1,5 +1,6 @@
 import numpy as no
 import odrive
+from odrive.enums import *
 from includes.gui import ODriveGUI
 import sys
 from PyQt5.QtWidgets import (
@@ -12,6 +13,8 @@ def main():
     window = ODriveGUI()
     window.show()
     sys.exit(app.exec_())
+
+    
 
 if __name__=="__main__":
     main()

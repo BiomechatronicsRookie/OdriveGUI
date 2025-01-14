@@ -1,6 +1,7 @@
 import sys
 import numpy as np
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QPushButton, QHBoxLayout, QButtonGroup
+from PyQt5.QtWidgets import QVBoxLayout, QWidget, QPushButton, QButtonGroup, QGridLayout, QLineEdit
+from PyQt5.QtGui import QDoubleValidator
 import pyqtgraph as pg
 
 class PlotsTab(QWidget):
@@ -10,17 +11,24 @@ class PlotsTab(QWidget):
         layout = QVBoxLayout()
         # Buttons on top of the plot
         self.control_top_panel = QWidget()
-        self.control_top_panel_layout = QHBoxLayout()
+        self.control_top_panel_layout = QGridLayout()
+        
 
         # Create three toggle buttons
         self.button1 = QPushButton("Position Control")
         self.button1.setCheckable(True)
+        self.button1_setpoint = QLineEdit()
+        self.button1_setpoint.setValidator(QDoubleValidator(-10.00,10.00,2))
 
         self.button2 = QPushButton("Velocity Control")
         self.button2.setCheckable(True)
+        self.button2_setpoint = QLineEdit()
+        self.button2_setpoint.setValidator(QDoubleValidator(-1.00,1.00,2))
 
         self.button3 = QPushButton("Torque Control")
         self.button3.setCheckable(True)
+        self.button3_setpoint = QLineEdit()
+        self.button3_setpoint.setValidator(QDoubleValidator(-0.5,0.5,2))
 
         self.button4 = QPushButton("Idle")
         self.button4.setCheckable(True)
@@ -34,10 +42,15 @@ class PlotsTab(QWidget):
         self.button_group.addButton(self.button4, 4)  # ID = 3
 
         # Add widgets to the layout
-        self.control_top_panel_layout.addWidget(self.button1)
-        self.control_top_panel_layout.addWidget(self.button2)
-        self.control_top_panel_layout.addWidget(self.button3)
-        self.control_top_panel_layout.addWidget(self.button4)
+        self.control_top_panel_layout.addWidget(self.button1,0,0)
+        self.control_top_panel_layout.addWidget(self.button2,0,1)
+        self.control_top_panel_layout.addWidget(self.button3,0,2)
+        self.control_top_panel_layout.addWidget(self.button4,0,3)
+        self.control_top_panel_layout.addWidget(self.button1_setpoint,1,0)
+        self.control_top_panel_layout.addWidget(self.button2_setpoint,1,1)
+        self.control_top_panel_layout.addWidget(self.button3_setpoint,1,2)
+
+
         self.control_top_panel.setLayout(self.control_top_panel_layout)
 
         self.graph_widget = pg.PlotWidget()
