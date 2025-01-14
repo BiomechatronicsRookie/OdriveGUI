@@ -3,7 +3,8 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QSplitter,
     QTableWidget,
-    QTableWidgetItem
+    QTableWidgetItem,
+    QHeaderView
     )
 from PyQt5.QtCore import Qt, QTimer
 
@@ -18,6 +19,8 @@ class MotorParameterWidget(QWidget):
             # Create the two tables
             self.table1 = QTableWidget()
             self.table2 = QTableWidget()
+            self.table1.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            self.table2.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
             # Add the tables to the splitter
             self.splitter.addWidget(self.table1)
@@ -41,7 +44,8 @@ class MotorParameterWidget(QWidget):
             self.timer.timeout.connect(self.populate_tables)
             self.timer.start(200)  # Refresh every `refresh_interval` ms
         else:
-            pass
+            layout = QVBoxLayout()
+            self.setLayout(layout)
 
     def populate_tables(self):
         """

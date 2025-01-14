@@ -13,9 +13,11 @@ from PyQt5.QtWidgets import (
     QSplitter
 )
 from PyQt5.QtCore import Qt, QTimer
+import pyqtgraph as pg
 import odrive
 from .mywidgets.topbar import TopBarWidget
-from .mywidgets.tabs import TabsMainWidget
+from .mywidgets.tabsWindow import TabsMainWidget
+from .mywidgets.tabs.plotsTab import PlotsTab
 from odrive.enums import *
 
 class ODriveGUI(QMainWindow):
@@ -23,25 +25,36 @@ class ODriveGUI(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("ODrive Motor Controller")
-
+        self.setFixedWidth(int(1920*0.75))
+        self.setFixedHeight(int(1080*0.75))
         # Helper object fields
         self.motors = []
         self.curr_motor = 0
+        self.data_buffer = np.linspace(0, 10, 1000)
+        self.phase = 0  # A variable to control animation
+        self.plot_active = None
 
         # Main layout
         self.main_layout = QVBoxLayout()
         # Top Bar
         self.top_bar = TopBarWidget()
+        self.bottom_bar =  QWidget()
+        self.bottom_bar_layout = QHBoxLayout()
+        self.bottom_bar.setLayout(self.bottom_bar_layout)
         # Main Window
         self.tab_window = TabsMainWidget()
+        self.plot_window = PlotsTab()
+
+        self.bottom_bar_layout.addWidget(self.tab_window, 2)
+        self.bottom_bar_layout.addWidget(self.plot_window, 5)
 
         # Combine layouts
         self.main_layout.addWidget(self.top_bar, 1)
-        self.main_layout.addWidget(self.tab_window, 3)
+        self.main_layout.addWidget(self.bottom_bar, 3)
 
-        container = QWidget()
-        container.setLayout(self.main_layout)
-        self.setCentralWidget(container)
+        self.container = QWidget()
+        self.container.setLayout(self.main_layout)
+        self.setCentralWidget(self.container)
 
         # SIGNAL CONNECTION FROM WIDGETS TO GUI FUNCTIONALITY
         # Top Bar
@@ -50,31 +63,34 @@ class ODriveGUI(QMainWindow):
         self.top_bar.motor_dropdown.activated.connect(self._QComboBox_activated)
 
         # Control Buttons
-        self.tab_window.button_group.buttonClicked[int].connect(self.on_control_button_clicked)
-
-        # Initial refresh
-        self.refresh_motor_list()
+        self.plot_window.button_group.buttonClicked[int].connect(self.on_control_button_clicked)
 
         # Timers
         # Set up the QTimer for periodic updates
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self._get_motor_state)
-        self.timer.start(200)  # Refresh every `refresh_interval` ms
+        self.timer_datapoll = QTimer(self)
+        self.timer_datapoll.timeout.connect(self._get_motor_state)
+        self.timer_datapoll.start(200)  # Refresh every `refresh_interval` ms
 
+        self.timer_plot = QTimer(self)
+        self.timer_plot.timeout.connect(self._update_plot)
+        self.timer_plot.start(100)  # Refresh every `refresh_interval` ms
 
     # TOP BAR HELPER FUNCTIONS
     def _QComboBox_activated(self, index):
         self.curr_motor = index
         # Select a Widget to replace
-        index_to_replace = self.main_layout.indexOf(self.tab_window)
+        index_to_replace = self.bottom_bar_layout.indexOf(self.tab_window)
 
         # Remove the widget from the layout
+        geometry, parent = self.tab_window.geometry(), self.tab_window.parent()
         if self.tab_window is not None:
             self.tab_window.setParent(None)
         # Recreate the widget
         self.tab_window = TabsMainWidget(self.motors[index])
+        self.tab_window.setParent(parent)
+        self.tab_window.setGeometry(geometry)
         #Insert it
-        self.main_layout.insertWidget(index_to_replace, self.tab_window,3)
+        self.bottom_bar_layout.insertWidget(index_to_replace, self.tab_window,2)
 
 
     def refresh_motor_list(self):
@@ -116,21 +132,49 @@ class ODriveGUI(QMainWindow):
         """
         if button_id == 1:
             # Activate Position mode
-            self.motors[self.curr_motor].axis0.config.control_mode = ControlMode.CONTROL_MODE_POSITION_CONTROL
+            #print(self.motors[self.curr_motor])
+            self.motors[self.curr_motor].axis0.config.control_mode = ControlMode.POSITION_CONTROL
             self.motors[self.curr_motor].axis0.requested_state = AxisState.CLOSED_LOOP_CONTROL
+            self.plot_active = 'P'
         elif button_id == 2:
             # Activate Velocity mode
-            pass
+            self.motors[self.curr_motor].axis0.controller.config.control_mode = ControlMode.VELOCITY_CONTROL
+            self.motors[self.curr_motor].axis0.requested_state = AxisState.CLOSED_LOOP_CONTROL
+            self.plot_active = 'V'
         elif button_id == 3:
-            # Activate Idle Mode
-            self.motors[self.curr_motor].axis0.requested_state = AxisState.IDLE
+            # Activate Torque Mode
+            self.motors[self.curr_motor].axis0.config.control_mode = ControlMode.TORQUE_CONTROL
+            self.motors[self.curr_motor].axis0.requested_state = AxisState.CLOSED_LOOP_CONTROL
+            self.plot_active = 'T'
         elif button_id == 4:
             # Activate Calibration
-            self.motors[self.curr_motor].axis0.requested_state = AxisState.STARTUP_SEQUENCE
-            self.motors[self.curr_motor].axis0.requested_state = AxisState.MOTOR_CALIBRATION
+            self.motors[self.curr_motor].axis0.requested_state = AxisState.IDLE
+            self.plot_active = None
 
     def _get_motor_state(self):
         if self.motors:
             self.top_bar.state.setText("State: " + str(self.motors[self.curr_motor].axis0.current_state))
         else:
             self.top_bar.state.setText('-')
+
+    def _update_plot(self):
+        """Update the plot with new data."""
+        # Generate sine wave data with an animated phase
+        match self.plot_active:
+            case 'P':
+                y = np.sin(self.data_buffer + self.phase)
+                self.phase += 0.3  # Increment the phase to animate the wave
+                self.plot_window.graph_widget.clear()  # Clear previous data
+                self.plot_window.graph_widget.plot(self.data_buffer, y, pen=pg.mkPen(color="b", width=2))
+            case 'V':
+                y = np.sin(self.data_buffer + self.phase) + np.sin(self.data_buffer*1.5 + self.phase + 2)
+                self.phase += 0.3  # Increment the phase to animate the wave
+                self.plot_window.graph_widget.clear()  # Clear previous data
+                self.plot_window.graph_widget.plot(self.data_buffer, y, pen=pg.mkPen(color="b", width=2))
+            case 'T':
+                y = np.sin(self.data_buffer + self.phase) + np.sin(self.data_buffer*1.5 + self.phase - 8)*2
+                self.phase += 0.3  # Increment the phase to animate the wave
+                self.plot_window.graph_widget.clear()  # Clear previous data
+                self.plot_window.graph_widget.plot(self.data_buffer, y, pen=pg.mkPen(color="b", width=2))
+            case _:
+                pass
