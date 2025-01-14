@@ -102,6 +102,7 @@ class ODriveGUI(QMainWindow):
         self.top_bar.motor_dropdown.clear()
         if self.motors:
             self.top_bar.motor_dropdown.addItems(self.motor_ids)
+            if self.timer_datapoll.
 
     def get_connected_motors(self):
         """Fetch the list of connected motors."""
@@ -129,8 +130,6 @@ class ODriveGUI(QMainWindow):
         self.timer_plot.stop()
         time.sleep(6)
         self.refresh_motor_list()
-        self.timer_datapoll.start()
-        self.timer_plot.start()
 
     def on_control_button_clicked(self, button_id):
         """
