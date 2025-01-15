@@ -39,6 +39,8 @@ class ODriveGUI(QMainWindow):
         self.mode = None
         self.static_helper = np.linspace(1,5000,5000)
         self.pos_plot_buffer = []
+        self.vel_plot_buffer = []
+        self.torque_plot_buffer = []
 
         # Main layout
         self.main_layout = QVBoxLayout()
@@ -184,11 +186,25 @@ class ODriveGUI(QMainWindow):
         """Update the plot with new data."""
         # Generate sine wave data with an animated phase
         if self.plot_active:
-            self.pos_plot_buffer.extend(batch[0])
-            if len(self.pos_plot_buffer) == self.plot_buffer_len:
-                self.pos_plot_buffer = [self.pos_plot_buffer.pop() for idx in range(self.buffer_len)]
-            self.plot_window.graph_widget.clear()  # Clear previous data
-            self.plot_window.graph_widget.plot(self.static_helper[0:len(self.pos_plot_buffer)], np.array(self.pos_plot_buffer).ravel(), pen=pg.mkPen(color="b", width=2))
+            match self.mode:
+                case 3:
+                    self.pos_plot_buffer.extend(batch[0])
+                    if len(self.pos_plot_buffer) == self.plot_buffer_len:
+                        self.pos_plot_buffer = [self.pos_plot_buffer.pop() for idx in range(self.buffer_len)]
+                    self.plot_window.graph_widget.clear()  # Clear previous data
+                    self.plot_window.graph_widget.plot(self.static_helper[0:len(self.pos_plot_buffer)], np.array(self.pos_plot_buffer).ravel(), pen=pg.mkPen(color="b", width=2))
+                case 2:
+                    self.vel_plot_buffer.extend(batch[1])
+                    if len(self.vel_plot_buffer) == self.plot_buffer_len:
+                        self.vel_plot_buffer = [self.vel_plot_buffer.pop() for idx in range(self.buffer_len)]
+                    self.plot_window.graph_widget.clear()  # Clear previous data
+                    self.plot_window.graph_widget.plot(self.static_helper[0:len(self.vel_plot_buffer)], np.array(self.vel_plot_buffer).ravel(), pen=pg.mkPen(color="r", width=2))
+                case 1:
+                    self.torque_plot_buffer.extend(batch[2])
+                    if len(self.torque_plot_buffer) == self.plot_buffer_len:
+                        self.torque_plot_buffer = [self.torque_plot_buffer.pop() for idx in range(self.buffer_len)]
+                    self.plot_window.graph_widget.clear()  # Clear previous data
+                    self.plot_window.graph_widget.plot(self.static_helper[0:len(self.torque_plot_buffer)], np.array(self.torque_plot_buffer).ravel(), pen=pg.mkPen(color="r", width=2))
 
     def closeEvent(self, event):
         for i in self.motors:
