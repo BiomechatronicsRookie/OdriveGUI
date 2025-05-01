@@ -72,8 +72,13 @@ class MotorParameterWidget(QWidget):
             "Current Lim. Range": self.motor.axis0.motor.config.requested_current_range,
             "Calibration Current":self.motor.axis0.motor.config.calibration_current,
             "Axis Error Code":self.motor.axis0.error,
-            "Motor Error Code":self.motor.error
+            "Motor Error Code":self.motor.error,
+            "Motor Error":self.motor.axis0.motor.error,
+            "Encoder Error":self.motor.axis0.encoder.error,
+            "Controller Error":self.motor.axis0.controller.error
+            
         }
+
 
         # Set up the table
         self.table1.setRowCount(len(parameter_map))
@@ -128,8 +133,10 @@ class MotorParameterWidget(QWidget):
     
     def _config(self):
         pass
-        self.motor.axis0.motor.config.current_lim = 5.0
-        self.motor.axis0.motor.config.current_lim_margin = 1.0
-        self.motor.axis0.motor.config.requested_current_range = 6.0
+        self.motor.axis0.motor.config.current_lim = 5.0                 #soft limit
+        self.motor.axis0.motor.config.current_lim_margin = 5.0          #+soft limit = hard limit
+        self.motor.axis0.motor.config.requested_current_range = 10.0    #should be >= hard limit
         self.motor.axis0.motor.config.calibration_current = 2.0
+
+
         self.motor.clear_errors()
