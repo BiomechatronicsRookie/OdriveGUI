@@ -2,6 +2,7 @@ import sys
 import numpy as np
 from PyQt5.QtWidgets import QVBoxLayout, QWidget, QPushButton, QButtonGroup, QGridLayout, QLineEdit
 from PyQt5.QtGui import QDoubleValidator
+from PyQt5 import QtCore
 import pyqtgraph as pg
 
 class PlotsTab(QWidget):
@@ -17,17 +18,17 @@ class PlotsTab(QWidget):
         self.button1 = QPushButton("Position Control")
         self.button1.setCheckable(True)
         self.button1_setpoint = QLineEdit()
-        self.button1_setpoint.setValidator(QDoubleValidator(-10.00,10.00,2))
+        self.button1_setpoint.setValidator(QDoubleValidator(-10.00,10.00,2).setLocale(QtCore.QLocale("en_US")))
 
         self.button2 = QPushButton("Velocity Control")
         self.button2.setCheckable(True)
         self.button2_setpoint = QLineEdit()
-        self.button2_setpoint.setValidator(QDoubleValidator(-1.00,1.00,2))
+        self.button2_setpoint.setValidator(QDoubleValidator(-1.00,1.00,2).setLocale(QtCore.QLocale("en_US")))
 
         self.button3 = QPushButton("Torque Control")
         self.button3.setCheckable(True)
         self.button3_setpoint = QLineEdit()
-        self.button3_setpoint.setValidator(QDoubleValidator(-0.5,0.5,2))
+        self.button3_setpoint.setValidator(QDoubleValidator(-0.5,0.5,2).setLocale(QtCore.QLocale("en_US")))
 
         self.button4 = QPushButton("Idle")
         self.button4.setCheckable(True)
